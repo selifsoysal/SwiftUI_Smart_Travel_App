@@ -1,4 +1,4 @@
-# Routey - AI Travel Planner ✈️🌍
+# Routey - AI Travel Planner
 
 Routey (SmartTravelApp), seyahat planlamayı akıllı, kişiselleştirilmiş ve sosyal bir deneyime dönüştüren, **SwiftUI** ile geliştirilmekte olan yeni nesil bir iOS seyahat uygulamasıdır. İçerisinde barındırdığı yapay zeka (Gemini & CoreML) destekli rota oluşturucu, kişiliğe göre destinasyon önerileri ve "Sosyal Eşleşme" modülü ile gezginlere seyahat arkadaşı bulma imkanı sunar.
 

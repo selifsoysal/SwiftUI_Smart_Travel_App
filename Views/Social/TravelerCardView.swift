@@ -6,10 +6,18 @@ struct TravelerCardView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var socialManager = SocialManager.shared
     
+    @State private var showDetail = false
+    @State private var showMatchDetails = false
+    
     // Durum kontrolü
     private var connectionStatus: ConnectionStatus? {
         guard let myId = authVM.currentUser?.id else { return nil }
-        return socialManager.getRequestStatus(between: myId, and: match.traveler.id)
+        return socialManager.getRequestStatus(
+            between: myId, 
+            and: match.traveler.id, 
+            tripId: match.traveler.plannedTrips.first?.tripId,
+            tripDestination: match.traveler.plannedTrips.first?.location
+        )
     }
     
     var body: some View {
@@ -29,7 +37,8 @@ struct TravelerCardView: View {
                         .font(.headline)
                         .fontWeight(.bold)
                     
-                    Text("\(match.traveler.age) Yaş • \(match.traveler.travelerType.rawValue)")
+                    let dominantProfile = match.traveler.profileWeights?.max(by: { $0.value < $1.value })?.key ?? "Gezgin"
+                    Text("\(match.traveler.age) Yaş • \(dominantProfile)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -37,41 +46,70 @@ struct TravelerCardView: View {
                 Spacer()
                 
                 // Match Score Circle
-                ZStack {
-                    Circle()
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 4)
-                        .frame(width: 45, height: 45)
-                    
-                    Circle()
-                        .trim(from: 0.0, to: CGFloat(match.matchScore) / 100.0)
-                        .stroke(Color(hex: "#FF5A5F"), style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                        .frame(width: 45, height: 45)
-                        .rotationEffect(.degrees(-90))
-                    
-                    Text("%\(match.matchScore)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(Color(hex: "#FF5A5F"))
+                if match.matchScore > 0 {
+                        Button(action: { showMatchDetails = true }) {
+                            ZStack {
+                                Circle()
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 4)
+                                    .frame(width: 45, height: 45)
+                                
+                                Circle()
+                                    .trim(from: 0.0, to: CGFloat(match.matchScore) / 100.0)
+                                    .stroke(Color(hex: "#FF5A5F"), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                                    .frame(width: 45, height: 45)
+                                    .rotationEffect(.degrees(-90))
+                                
+                                Text("%\(match.matchScore)")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(Color(hex: "#FF5A5F"))
+                            }
+                        }
+                        .sheet(isPresented: $showMatchDetails) {
+                            MatchAnalysisView(details: MatchingScoreDetails(score: match.matchScore, explanations: match.explanations))
+                        }
+                } else {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 4)
+                            .frame(width: 45, height: 45)
+                        
+                        Text("%0")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.gray)
+                    }
                 }
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("Ortak Planlar:")
+                Text(match.matchScore > 0 ? "Ortak Planlar:" : "Planlanan Seyahatler:")
                     .font(.footnote)
                     .foregroundColor(.secondary)
                     .fontWeight(.bold)
                 
-                ForEach(match.traveler.plannedTrips) { trip in
-                    Text("\(trip.location) (\(formatDate(trip.startDate)) - \(formatDate(trip.endDate)))")
+                if match.traveler.plannedTrips.isEmpty {
+                    Text("Henüz planı yok.")
                         .font(.footnote)
                         .foregroundColor(.primary)
-                        .lineLimit(1)
+                } else {
+                    ForEach(match.traveler.plannedTrips.prefix(2)) { trip in
+                        Text("\(trip.location) (\(formatDate(trip.startDate)) - \(formatDate(trip.endDate)))")
+                            .font(.footnote)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
+                    if match.traveler.plannedTrips.count > 2 {
+                        Text("ve \(match.traveler.plannedTrips.count - 2) seyahat daha...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             
             HStack(spacing: 12) {
                 Button(action: {
-                    // Detay Gör (Modal açılabilir)
+                    showDetail = true
                 }) {
                     Text("Detay Gör")
                         .font(.subheadline)
@@ -85,19 +123,55 @@ struct TravelerCardView: View {
                 
                 // Social Action Button
                 if connectionStatus == .pending {
-                    Button(action: {}) {
-                        Text("İstek Gönderildi")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.gray.opacity(0.4))
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
+                    if let pendingReq = socialManager.getPendingRequest(
+                        between: authVM.currentUser?.id ?? "", 
+                        and: match.traveler.id, 
+                        tripId: match.traveler.plannedTrips.first?.tripId,
+                        tripDestination: match.traveler.plannedTrips.first?.location
+                    ) {
+                        if pendingReq.senderId == authVM.currentUser?.id {
+                            Button(action: {
+                                socialManager.withdrawRequest(requestId: pendingReq.id)
+                            }) {
+                                Text("İsteği Geri Çek")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.orange.opacity(0.8))
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                            }
+                        } else {
+                            Button(action: {}) {
+                                Text("Gelen İstek")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.gray.opacity(0.4))
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                            }
+                            .disabled(true)
+                        }
+                    } else {
+                        Button(action: {}) {
+                            Text("İşleniyor...")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .background(Color.gray.opacity(0.4))
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                        .disabled(true)
                     }
-                    .disabled(true)
                 } else if connectionStatus == .accepted {
-                    NavigationLink(destination: ChatDetailView(targetTraveler: match.traveler)) {
+                    let targetTrip = match.traveler.plannedTrips.first
+                    let conns = socialManager.getGroupConnections(for: targetTrip?.location, or: targetTrip?.tripId)
+                    NavigationLink(destination: ChatDetailView(targetTraveler: match.traveler, providedConnections: conns)) {
                         Text("Mesaja Git")
                             .font(.subheadline)
                             .fontWeight(.semibold)
@@ -107,10 +181,26 @@ struct TravelerCardView: View {
                             .foregroundColor(.white)
                             .cornerRadius(8)
                     }
+                } else if connectionStatus == .rejected {
+                    Button(action: {
+                        guard let myId = authVM.currentUser?.id else { return }
+                        let targetTrip = match.traveler.plannedTrips.first
+                        socialManager.sendRequest(from: myId, to: match.traveler.id, tripId: targetTrip?.tripId, tripDestination: targetTrip?.location)
+                    }) {
+                        Text("Tekrar İstek Gönder")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(hex: "#FF5A5F"))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
                 } else {
                     Button(action: {
                         guard let myId = authVM.currentUser?.id else { return }
-                        socialManager.sendRequest(from: myId, to: match.traveler.id)
+                        let targetTrip = match.traveler.plannedTrips.first
+                        socialManager.sendRequest(from: myId, to: match.traveler.id, tripId: targetTrip?.tripId, tripDestination: targetTrip?.location)
                     }) {
                         Text("İstek Gönder")
                             .font(.subheadline)
@@ -136,6 +226,9 @@ struct TravelerCardView: View {
                 socialManager.loadSocialData(for: myId)
             }
         }
+        .sheet(isPresented: $showDetail) {
+            TravelerDetailView(traveler: match.traveler)
+        }
     }
     
     private func formatDate(_ date: Date) -> String {
@@ -146,29 +239,5 @@ struct TravelerCardView: View {
     }
 }
 
+
 // Extension for Color is below..
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}

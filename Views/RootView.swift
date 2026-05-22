@@ -9,7 +9,7 @@ struct RootView: View {
                 // Hiç giriş yapmamış veya çıkış yapmış
                 AuthView().environmentObject(authVM)
             }
-            else if let user = authVM.currentUser, !user.isOnboardingCompleted {
+            else if let user = authVM.currentUser, !(user.isOnboardingCompleted ?? false) {
                 // Giriş yapmış ama onboarding bitmemiş
                 SwipeOnboardingView().environmentObject(authVM)
             }
@@ -17,6 +17,9 @@ struct RootView: View {
                 // Giriş yapmış ve onboarding bitmiş
                 MainTabView().environmentObject(authVM)
             }
+        }
+        .onAppear {
+            NotificationManager.shared.requestPermission()
         }
     }
 }

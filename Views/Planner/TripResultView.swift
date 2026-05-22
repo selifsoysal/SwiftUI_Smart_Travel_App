@@ -1,14 +1,39 @@
 import SwiftUI
 import MapKit
+import FirebaseAuth
 
 struct TripResultView: View {
     let plan: GeminiTripPlan
-    @StateObject private var savedTripsManager = SavedTripsManager.shared
-    @State private var showSavedToast = false
+    @State private var editablePlan: GeminiTripPlan
     
-    // Aktivitelerden harita pinleri üretir (lat/lng 0 olmayanlar)
+    @StateObject private var savedTripsManager = SavedTripsManager.shared
+    @StateObject var socialManager = SocialManager.shared
+    @EnvironmentObject var authVM: AuthViewModel
+    
+    @State private var showSavedToast = false
+    @State private var showEventToast = false
+    @State private var selectedDayForAdd: Int?
+    @State private var selectedDayIndex: Int = 0
+    @State private var showSharingSelection = false
+    @State private var sharingConflictAlert = false
+    @State private var mapPosition: MapCameraPosition = .automatic
+    
+    var isReadOnly: Bool
+    
+    init(plan: GeminiTripPlan, isReadOnly: Bool = false) {
+        self.plan = plan
+        self.isReadOnly = isReadOnly
+        
+        var initialPlan = plan
+        if initialPlan.id == nil {
+            initialPlan.id = UUID().uuidString
+        }
+        self._editablePlan = State(initialValue: initialPlan)
+    }
+    
     private var mapPins: [MapPin] {
-        plan.itinerary.flatMap { $0.activities }.compactMap { activity in
+        guard editablePlan.itinerary.indices.contains(selectedDayIndex) else { return [] }
+        return editablePlan.itinerary[selectedDayIndex].activities.compactMap { activity in
             if activity.estimatedLat != 0.0 && activity.estimatedLng != 0.0 {
                 return MapPin(name: activity.placeName, coordinate: CLLocationCoordinate2D(latitude: activity.estimatedLat, longitude: activity.estimatedLng))
             }
@@ -16,171 +41,440 @@ struct TripResultView: View {
         }
     }
     
-    // Pinlerin lokasyonuna göre harita merkezini ayarlar
-    @State private var region: MKCoordinateRegion = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
-    )
-    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                
-                // 1) En tepede Hedef ve Başlık
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(plan.selectedDestination)
-                        .font(.largeTitle)
-                        .fontWeight(.heavy)
-                        
-                    Text(plan.tripTitle)
-                        .font(.title3)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal)
-                
-                // 2) Dinamik Harita Alanı
-                if !mapPins.isEmpty {
-                    Map(coordinateRegion: $region, annotationItems: mapPins) { pin in
-                        MapMarker(coordinate: pin.coordinate, tint: .red)
-                    }
-                    .overlay(
-                        Map {
-                            if #available(iOS 17.0, *) {
-                                // Farklı renkler listesi
-                                let lineColors: [Color] = [.blue, .purple, .green, .orange, .pink, .teal, .indigo, .red]
-                                
-                                ForEach(Array(plan.itinerary.enumerated()), id: \.offset) { index, day in
-                                    let dayPins = day.activities.compactMap {
-                                        $0.estimatedLat != 0.0 && $0.estimatedLng != 0.0 ? CLLocationCoordinate2D(latitude: $0.estimatedLat, longitude: $0.estimatedLng) : nil
-                                    }
-                                    
-                                    if !dayPins.isEmpty {
-                                        // Pinleri Göster
-                                        ForEach(Array(dayPins.enumerated()), id: \.offset) { pIndex, coord in
-                                            Marker(day.activities[pIndex].placeName, coordinate: coord)
-                                                .tint(lineColors[index % lineColors.count])
-                                        }
-                                        
-                                        // Çizgiyi Göster
-                                        MapPolyline(coordinates: dayPins)
-                                            .stroke(lineColors[index % lineColors.count], lineWidth: 4)
-                                    }
-                                }
-                            }
-                        }
-                        .opacity(mapPins.count > 0 ? 1 : 0) // Polyline üst üste ezsin
-                    )
-                    .frame(height: 250)
-                    .cornerRadius(15)
-                    .padding(.horizontal)
-                    .shadow(radius: 5)
-                    .onAppear {
-                        if let first = mapPins.first {
-                            region = MKCoordinateRegion(
-                                center: first.coordinate,
-                                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                            )
-                        }
-                    }
-                }
-                
-                // 3) Yatay Kaydırılabilir General Tips Kartları
-                if !plan.generalTips.isEmpty {
-                    VStack(alignment: .leading) {
-                        Text("İpuçları")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 15) {
-                                ForEach(plan.generalTips, id: \.self) { tip in
-                                    Text(tip)
-                                        .padding()
-                                        .background(Color.blue.opacity(0.1))
-                                        .cornerRadius(12)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .frame(width: 250)
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                }
-                
-                Divider()
-                
-                // 4) Seyahat Planı / Rota
-                Text("Seyahat Planı")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .padding(.horizontal)
-                
-                ForEach(plan.itinerary) { dayInfo in
-                    VStack(alignment: .leading, spacing: 10) {
-                        // Gün Başlığı
-                        Text(dayInfo.dateDescription)
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .padding(.top, 10)
-                        
-                        // Aktiviteler
-                        ForEach(dayInfo.activities) { activity in
-                            HStack(alignment: .top, spacing: 12) {
-                                VStack {
-                                    Text(activity.timeOfDay)
-                                        .font(.subheadline)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.blue)
-                                    Spacer()
-                                }
-                                .frame(width: 70, alignment: .leading)
-                                
-                                VStack(alignment: .leading, spacing: 5) {
-                                    HStack {
-                                        Text(activity.placeName)
-                                            .font(.headline)
-                                        Spacer()
-                                        Text(activity.costCategory)
-                                            .font(.caption)
-                                            .padding(4)
-                                            .background(Color.green.opacity(0.2))
-                                            .cornerRadius(6)
-                                    }
-                                    
-                                    Text(activity.description)
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .padding()
-                            .background(Color(UIColor.secondarySystemGroupedBackground))
-                            .cornerRadius(12)
-                            .shadow(color: .black.opacity(0.04), radius: 5, y: 3)
-                        }
-                    }
-                    .padding(.horizontal)
-                }
+                headerSection
+                participantsSection
+                daySelectorSection
+                mapSection
+                tipsSection
+                Divider().padding(.horizontal)
+                itinerarySection
+                matchSection
+                Spacer(minLength: 50)
             }
             .padding(.vertical)
         }
         .background(Color(UIColor.systemGroupedBackground).edgesIgnoringSafeArea(.all))
         .navigationTitle("Plan Özeti")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    savedTripsManager.saveTrip(plan)
-                    showSavedToast = true
-                } label: {
-                    Image(systemName: "bookmark.fill")
-                        .foregroundColor(savedTripsManager.savedTrips.contains(where: { $0.id == plan.id }) ? .yellow : .blue)
+        .onAppear {
+            updateMapPosition()
+        }
+        .alert(isPresented: $showSavedToast) {
+            Alert(title: Text("Kaydedildi"), message: Text("Rota başarıyla Profil ve Rotalarım sayfasına eklendi."), dismissButton: .default(Text("Tamam")))
+        }
+        .overlay(
+            Group {
+                if showEventToast {
+                    VStack {
+                        Spacer()
+                        Text("Etkinlik başarıyla Keşfet panosuna eklendi!")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(10)
+                            .padding(.bottom, 40)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            withAnimation { showEventToast = false }
+                        }
+                    }
+                }
+            }
+        )
+        .sheet(isPresented: $showSharingSelection) {
+            SharingSelectionView { mode in
+                updateSharingMode(mode)
+            }
+            .presentationDetents([.height(300)])
+        }
+        .sheet(item: Binding<AddDayItem?>(
+            get: { selectedDayForAdd.map { AddDayItem(dayIndex: $0) } },
+            set: { selectedDayForAdd = $0?.dayIndex }
+        )) { item in
+            let dayNum = editablePlan.itinerary[item.dayIndex].dayNumber
+            AddPlaceView(dayNumber: dayNum) { newActivity in
+                var updatedPlan = editablePlan
+                updatedPlan.itinerary[item.dayIndex].activities.append(newActivity)
+                updatedPlan.itinerary[item.dayIndex].activities.sort { $0.timeOfDay < $1.timeOfDay }
+                editablePlan = updatedPlan
+                savedTripsManager.updateTrip(editablePlan)
+            }
+        }
+    }
+    
+    // MARK: - Sub-views
+    
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(plan.selectedDestination)
+                .font(.largeTitle)
+                .fontWeight(.heavy)
+            
+            Text(plan.tripTitle)
+                .font(.title3)
+                .foregroundColor(.secondary)
+            
+            if !isReadOnly {
+                let isSaved = savedTripsManager.savedTrips.contains(where: { $0.id == editablePlan.id })
+                if !isSaved {
+                    Button {
+                        withAnimation {
+                            savedTripsManager.saveTrip(editablePlan, user: authVM.currentUser)
+                            showSavedToast = true
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "bookmark.fill")
+                            Text("Rotayı Kaydet")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(hex: "#008285"))
+                        .cornerRadius(12)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                            Text("Rota Kaydedildi").font(.subheadline.bold()).foregroundColor(.green)
+                            Spacer()
+                        }
+                        .padding(.vertical, 8).padding(.horizontal).background(Color.green.opacity(0.1)).cornerRadius(10)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Topluluk Paylaşımı").font(.headline)
+                            let sharingText: String = {
+                                switch editablePlan.sharingMode {
+                                case .fullTrip: return "Bu rota şu an toplulukta herkes tarafından görülebilir."
+                                case .specificEvents: return "Sadece seçtiğiniz aktiviteler toplulukta görülebilir."
+                                default: return "Bu rota şu an sadece size özel."
+                                }
+                            }()
+                            Text(sharingText).font(.caption).foregroundColor(.secondary)
+                            
+                            HStack(spacing: 15) {
+                                Button(action: { showSharingSelection = true }) {
+                                    Text("Değiştir").font(.subheadline.bold()).foregroundColor(Color(hex: "#008285"))
+                                }
+                                
+                                if editablePlan.sharingMode != .none {
+                                    Button(role: .destructive, action: { updateSharingMode(.none) }) {
+                                        Text("Paylaşımı Durdur").font(.subheadline.bold()).foregroundColor(.red)
+                                    }
+                                }
+                            }
+                        }
+                        .padding().background(Color.gray.opacity(0.05)).cornerRadius(12)
+                    }
                 }
             }
         }
-        .alert(isPresented: $showSavedToast) {
-            Alert(title: Text("Kaydedildi"), message: Text("Rota başarıyla Profil ve Trips sayfasına eklendi."), dismissButton: .default(Text("Tamam")))
+        .padding(.horizontal)
+    }
+    
+    private var participantsSection: some View {
+        Group {
+            if let tripId = editablePlan.id, savedTripsManager.savedTrips.contains(where: { $0.id == tripId }) {
+                TripParticipantsView(trip: savedTripsManager.savedTrips.first(where: { $0.id == tripId }) ?? editablePlan)
+                    .padding(.top, 10)
+                Divider().padding(.horizontal)
+            }
         }
     }
+    
+    private var daySelectorSection: some View {
+        Group {
+            if !editablePlan.itinerary.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Array(editablePlan.itinerary.enumerated()), id: \.offset) { index, day in
+                            Button(action: {
+                                withAnimation {
+                                    selectedDayIndex = index
+                                    updateMapPosition()
+                                }
+                            }) {
+                                Text("\(day.dayNumber). Gün")
+                                    .font(.subheadline).fontWeight(.bold).padding(.horizontal, 16).padding(.vertical, 10)
+                                    .background(selectedDayIndex == index ? Color(hex: "#008285") : Color(.systemGray6))
+                                    .foregroundColor(selectedDayIndex == index ? .white : .primary).cornerRadius(20)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+    
+    private var mapSection: some View {
+        Group {
+            if !mapPins.isEmpty {
+                Map(position: $mapPosition) {
+                    ForEach(mapPins) { pin in
+                        Marker(pin.name, coordinate: pin.coordinate).tint(.blue)
+                    }
+                    if mapPins.count > 1 {
+                        MapPolyline(coordinates: mapPins.map { $0.coordinate }).stroke(.blue, lineWidth: 4)
+                    }
+                }
+                .frame(height: 250).cornerRadius(15).padding(.horizontal).shadow(radius: 5)
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "map.slash").font(.title2).foregroundColor(.gray.opacity(0.5))
+                    Text("Bu gün için konum verisi sağlanamadı.").font(.caption).foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity).frame(height: 150).background(Color.gray.opacity(0.05)).cornerRadius(15).padding(.horizontal)
+            }
+        }
+    }
+    
+    private var tipsSection: some View {
+        Group {
+            if !editablePlan.generalTips.isEmpty {
+                VStack(alignment: .leading) {
+                    Text("İpuçları").font(.headline).padding(.horizontal)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 15) {
+                            ForEach(editablePlan.generalTips, id: \.self) { tip in
+                                Text(tip).padding().background(Color.blue.opacity(0.1)).cornerRadius(12)
+                                    .fixedSize(horizontal: false, vertical: true).frame(width: 250)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var itinerarySection: some View {
+        Group {
+            if editablePlan.itinerary.indices.contains(selectedDayIndex) {
+                let dayInfo = editablePlan.itinerary[selectedDayIndex]
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(dayInfo.dateDescription).font(.headline).foregroundColor(.secondary).padding(.horizontal)
+                    
+                    ForEach(Array(dayInfo.activities.enumerated()), id: \.offset) { actIndex, activity in
+                        ActivityRowView(activity: activity, canEdit: !isReadOnly, onDelete: {
+                            deleteActivity(at: IndexSet(integer: actIndex), dayIndex: selectedDayIndex)
+                        }, onCreateEvent: {
+                            if editablePlan.sharingMode == .none {
+                                updateSharingMode(.specificEvents)
+                            }
+                            createEvent(for: activity, dayInfo: dayInfo)
+                        })
+                    }
+                    
+                    if !isReadOnly {
+                        Button(action: { selectedDayForAdd = selectedDayIndex }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Yeni Yer Ekle")
+                            }
+                            .font(.headline).foregroundColor(.blue).padding(.vertical, 8)
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var matchSection: some View {
+        EmptyView()
+    }
+    
+    // MARK: - Logic
+    
+    private func updateMapPosition() {
+        if let firstPin = mapPins.first {
+            let region = MKCoordinateRegion(
+                center: firstPin.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            )
+            mapPosition = .region(region)
+        } else {
+            mapPosition = .automatic
+        }
+    }
+    
+    private func updateSharingMode(_ mode: SharingMode) {
+        editablePlan.sharingMode = mode
+        editablePlan.isPublic = (mode == .fullTrip)
+        if let tid = editablePlan.id {
+            savedTripsManager.updateTripSharingMode(tripId: tid, mode: mode)
+        }
+    }
+    
+    private func deleteActivity(at offsets: IndexSet, dayIndex: Int) {
+        var updatedPlan = editablePlan
+        updatedPlan.itinerary[dayIndex].activities.remove(atOffsets: offsets)
+        editablePlan = updatedPlan
+        savedTripsManager.updateTrip(editablePlan)
+    }
+    
+    private func createEvent(for activity: Activity, dayInfo: DailyItinerary) {
+        guard let user = authVM.currentUser, let uid = Auth.auth().currentUser?.uid else { return }
+        
+        // Eğer zaten varsa sil (Toggle mantığı)
+        if let existing = socialManager.myEvents.first(where: { $0.activityId == activity.id.uuidString && $0.tripId == (editablePlan.id ?? "") }) {
+            socialManager.deleteEvent(eventId: existing.id ?? "", userId: uid)
+            return
+        }
+        
+        let event = ActivityEvent(
+            hostId: uid,
+            hostName: user.name ?? "Gezgin",
+            hostAvatar: user.profileImageUrl,
+            hostProfileWeights: user.profileWeights,
+            hostTravelType: user.travelType?.rawValue,
+            hostBudget: user.budget?.rawValue,
+            hostAge: user.age,
+            hostGender: user.gender,
+            hostCompanions: user.companions,
+            tripId: editablePlan.id ?? UUID().uuidString,
+            activityId: activity.id.uuidString,
+            destination: editablePlan.selectedDestination,
+            placeName: activity.placeName,
+            dateDescription: dayInfo.dateDescription,
+            timeOfDay: activity.timeOfDay,
+            createdAt: Date(),
+            sharingMode: .specificEvents
+        )
+        
+        DatabaseManager.shared.saveEvent(event) { error in
+            if error == nil {
+                DispatchQueue.main.async {
+                    withAnimation { self.showEventToast = true }
+                    self.socialManager.loadSocialData(for: uid)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Supporting Views
+
+struct ActivityRowView: View {
+    let activity: Activity
+    var canEdit: Bool
+    var onDelete: () -> Void
+    var onCreateEvent: () -> Void
+    
+    @StateObject private var socialManager = SocialManager.shared
+    
+    var isEventCreated: Bool {
+        socialManager.myEvents.contains { $0.activityId == activity.id.uuidString }
+    }
+    
+    var body: some View {
+        NavigationLink(destination: PlaceDetailView(activity: activity)) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack {
+                    Text(activity.timeOfDay)
+                        .font(.subheadline).fontWeight(.bold).foregroundColor(.blue)
+                    Spacer()
+                }
+                .frame(width: 70, alignment: .leading)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(activity.placeName).font(.headline)
+                        Spacer()
+                        Text(activity.costCategory == "Paid" ? "Ücretli" : (activity.costCategory == "Free" ? "Ücretsiz" : activity.costCategory))
+                            .font(.caption).padding(4).background(Color.green.opacity(0.2)).cornerRadius(6)
+                        
+                        if canEdit {
+                            Button(action: onDelete) {
+                                Image(systemName: "trash").foregroundColor(.red)
+                            }
+                        }
+                    }
+                    
+                    Text(activity.description).font(.subheadline).foregroundColor(.secondary).multilineTextAlignment(.leading)
+                    
+                    if canEdit {
+                        Button(action: onCreateEvent) {
+                            HStack {
+                                Image(systemName: isEventCreated ? "checkmark.circle.fill" : "person.2.badge.plus")
+                                Text(isEventCreated ? "İstek Yayında" : "Bu Etkinlik İçin Arkadaş Bul")
+                            }
+                            .font(.caption).fontWeight(.semibold).foregroundColor(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(isEventCreated ? Color.green : Color(hex: "#FF5A5F")).cornerRadius(12)
+                        }
+                        .padding(.top, 4)
+                        .buttonStyle(PlainButtonStyle()) // Önemli: NavigationLink içinde butonun çalışması için
+                    }
+                }
+            }
+            .padding()
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal)
+    }
+}
+
+struct SharingSelectionView: View {
+    let onSelect: (SharingMode) -> Void
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Topluluk Paylaşım Modu").font(.headline).padding(.top)
+            Text("Diğer gezginlerin sizi nasıl bulmasını istersiniz?").font(.subheadline).foregroundColor(.secondary).multilineTextAlignment(.center).padding(.horizontal)
+            
+            VStack(spacing: 12) {
+                Button {
+                    onSelect(.fullTrip)
+                    dismiss()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Tüm Rota İçin Eşleş").font(.headline)
+                            Text("Tüm seyahat boyunca size eşlik edecek bir grup oluşturur.").font(.caption)
+                        }
+                        Spacer()
+                        Image(systemName: "person.2.fill")
+                    }
+                    .padding().background(Color(hex: "#008285")).foregroundColor(.white).cornerRadius(12)
+                }
+                
+                Button {
+                    onSelect(.specificEvents)
+                    dismiss()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Aktivite Bazlı Eşleş").font(.headline)
+                            Text("Sadece seçtiğiniz müze, yemek vb. aktiviteler için arkadaş bulur.").font(.caption)
+                        }
+                        Spacer()
+                        Image(systemName: "list.bullet.indent")
+                    }
+                    .padding().background(Color.orange).foregroundColor(.white).cornerRadius(12)
+                }
+            }
+            .padding(.horizontal)
+            Spacer()
+        }
+    }
+}
+
+struct AddDayItem: Identifiable {
+    let id = UUID()
+    let dayIndex: Int
 }
 
 struct MapPin: Identifiable {
@@ -188,4 +482,3 @@ struct MapPin: Identifiable {
     let name: String
     let coordinate: CLLocationCoordinate2D
 }
-

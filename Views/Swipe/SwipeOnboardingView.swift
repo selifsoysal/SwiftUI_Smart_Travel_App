@@ -6,7 +6,7 @@ struct SwipeOnboardingView: View {
     
     @State private var offset: CGSize = .zero
     @State private var showResult = false
-    @State private var resultProfile: TravelProfile?
+    @State private var resultWeights: [String: Double] = [:]
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -22,7 +22,7 @@ struct SwipeOnboardingView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                Text("\(vm.items.count) Kaldı")
+                Text("\(max(0, vm.items.count - vm.currentIndex)) Kaldı")
                     .font(.caption2.bold())
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -148,15 +148,15 @@ struct SwipeOnboardingView: View {
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .onAppear {
             vm.loadData()
-            vm.onFinish = { profile in
-                self.resultProfile = profile
+            vm.onFinish = { weights in
+                self.resultWeights = weights
                 self.showResult = true
             }
         }
         .fullScreenCover(isPresented: $showResult, onDismiss: {
             dismiss()
         }) {
-            TravelResultView(profile: resultProfile ?? .culture)
+            TravelResultView(weights: resultWeights)
         }
     }
 

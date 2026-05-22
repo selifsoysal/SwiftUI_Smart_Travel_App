@@ -1,38 +1,46 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @StateObject private var router = AppRouter.shared
 
     var body: some View {
-        TabView {
+        TabView(selection: $router.selectedTab) {
 
             DiscoverView()
                 .tabItem {
-                    Image(systemName: "safari")
+                    Image(systemName: "safari.fill")
                     Text("Keşfet")
                 }
+                .tag(0)
+
+            CommunityView()
+                .tabItem {
+                    Image(systemName: "person.2.fill")
+                    Text("Topluluk")
+                }
+                .tag(1)
 
             PlannerView()
                 .tabItem {
-                    Image(systemName: "map")
+                    Image(systemName: "plus.circle.fill")
                     Text("Planla")
                 }
+                .tag(2)
 
-            TripsView()
+            InboxView()
                 .tabItem {
-                    Image(systemName: "airplane")
-                    Text("Rotalarım")
+                    Image(systemName: "message.fill")
+                    Text("Mesajlar")
                 }
-
-            TravelersExploreView()
-                .tabItem {
-                    Image(systemName: "person.2.fill")
-                    Text("Gezginler")
-                }
+                .tag(3)
 
             ProfileView()
                 .tabItem {
-                    Image(systemName: "person")
+                    Image(systemName: "person.fill")
                     Text("Profilim")
                 }
-        }    }
+                .tag(4)
+        }
+        .environmentObject(router)
+    }
 }

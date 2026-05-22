@@ -11,6 +11,9 @@ struct AuthView: View {
     // Register alanları
     @State private var name = ""
     @State private var birthDate = Date()
+    @State private var gender = "Belirtmek İstemiyorum"
+    
+    let genders = ["Kadın", "Erkek", "Belirtmek İstemiyorum"]
     
     var body: some View {
         AppContainer {
@@ -82,6 +85,28 @@ struct AuthView: View {
                                 .padding()
                                 .background(Color(UIColor.secondarySystemBackground))
                                 .cornerRadius(12)
+                                
+                            // Gender Picker
+                            HStack(spacing: 12) {
+                                Image(systemName: "figure.dress.line.vertical.figure")
+                                    .foregroundColor(.gray)
+                                
+                                Text("Cinsiyet")
+                                    .foregroundColor(.gray)
+                                
+                                Spacer()
+                                
+                                Picker("Cinsiyet", selection: $gender) {
+                                    ForEach(genders, id: \.self) {
+                                        Text($0)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .accentColor(.primary)
+                            }
+                            .padding()
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(12)
                         }
                         
                         // Email
@@ -136,7 +161,8 @@ struct AuthView: View {
                                         email: email,
                                         password: password,
                                         name: name,
-                                        birthDate: birthDate
+                                        birthDate: birthDate,
+                                        gender: gender
                                     )
                                 }
                             }

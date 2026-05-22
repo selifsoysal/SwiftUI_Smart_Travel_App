@@ -7,8 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B34D674C2FB53A2C00DBBF12 /* TravelMatcherNew.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = B34D674B2FB53A2C00DBBF12 /* TravelMatcherNew.mlmodel */; };
 		B351BA3B2F96ADD500FA5469 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = B351BA3A2F96ADD500FA5469 /* GoogleGenerativeAI */; };
 		B351BA3F2F96B34600FA5469 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = B351BA3E2F96B34600FA5469 /* GoogleGenerativeAI */; };
+		B3F9B5282FB2320B00DF485D /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B3F9B5272FB2320B00DF485D /* GoogleService-Info.plist */; };
+		B3F9B52B2FB234B400DF485D /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = B3F9B52A2FB234B400DF485D /* FirebaseAnalytics */; };
+		B3F9B52D2FB234B400DF485D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B3F9B52C2FB234B400DF485D /* FirebaseAuth */; };
+		B3F9B52F2FB234B400DF485D /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B3F9B52E2FB234B400DF485D /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,9 +34,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B34D674B2FB53A2C00DBBF12 /* TravelMatcherNew.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = TravelMatcherNew.mlmodel; sourceTree = "<group>"; };
 		B3F2FBB52F915C0000D43A9C /* SmartTravelApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SmartTravelApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3F2FBC22F915C0200D43A9C /* SmartTravelAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SmartTravelAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3F2FBCC2F915C0200D43A9C /* SmartTravelAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SmartTravelAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3F9B5272FB2320B00DF485D /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -87,6 +94,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B3F9B52B2FB234B400DF485D /* FirebaseAnalytics in Frameworks */,
+				B3F9B52F2FB234B400DF485D /* FirebaseFirestore in Frameworks */,
+				B3F9B52D2FB234B400DF485D /* FirebaseAuth in Frameworks */,
 				B351BA3B2F96ADD500FA5469 /* GoogleGenerativeAI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -122,6 +132,8 @@
 				B3F2FBCF2F915C0200D43A9C /* SmartTravelAppUITests */,
 				B3F2FBB62F915C0000D43A9C /* Products */,
 				B305F6C82FA7AB840009A6E1 /* SS */,
+				B3F9B5272FB2320B00DF485D /* GoogleService-Info.plist */,
+				B34D674B2FB53A2C00DBBF12 /* TravelMatcherNew.mlmodel */,
 			);
 			sourceTree = "<group>";
 		};
@@ -162,6 +174,9 @@
 			name = SmartTravelApp;
 			packageProductDependencies = (
 				B351BA3A2F96ADD500FA5469 /* GoogleGenerativeAI */,
+				B3F9B52A2FB234B400DF485D /* FirebaseAnalytics */,
+				B3F9B52C2FB234B400DF485D /* FirebaseAuth */,
+				B3F9B52E2FB234B400DF485D /* FirebaseFirestore */,
 			);
 			productName = SmartTravelApp;
 			productReference = B3F2FBB52F915C0000D43A9C /* SmartTravelApp.app */;
@@ -246,6 +261,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B351BA392F96ADD500FA5469 /* XCRemoteSwiftPackageReference "generative-ai-swift" */,
+				B3F9B5292FB234B400DF485D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B3F2FBB62F915C0000D43A9C /* Products */;
@@ -264,6 +280,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B3F9B5282FB2320B00DF485D /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -288,6 +305,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B34D674C2FB53A2C00DBBF12 /* TravelMatcherNew.mlmodel in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -447,6 +465,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3QJY8RDNBP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Routey;
@@ -476,6 +495,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3QJY8RDNBP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Routey;
@@ -616,6 +636,14 @@
 				minimumVersion = 0.5.6;
 			};
 		};
+		B3F9B5292FB234B400DF485D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.13.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -628,6 +656,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B351BA392F96ADD500FA5469 /* XCRemoteSwiftPackageReference "generative-ai-swift" */;
 			productName = GoogleGenerativeAI;
+		};
+		B3F9B52A2FB234B400DF485D /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B3F9B5292FB234B400DF485D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		B3F9B52C2FB234B400DF485D /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B3F9B5292FB234B400DF485D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		B3F9B52E2FB234B400DF485D /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B3F9B5292FB234B400DF485D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

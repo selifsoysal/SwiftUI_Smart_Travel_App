@@ -2,72 +2,79 @@ import Foundation
 
 class MatchingEngine {
     
-    /// Calculate match score based only on Budget and Traveler Type (50% each).
-    /// Location and Dates act as MUST-HAVE filters (±3 days). Returns 0 if filters fail.
     static func calculateScore(currentUser: User, candidate: Traveler, currentUserTrips: [GeminiTripPlan]) -> Int {
-        var passesFilter = false
+        // 1. Lokasyon ve Tarih Çakışması (ÖN ŞART)
+        let overlappingTrips = findOverlappingTrips(myTrips: currentUserTrips, theirTrips: candidate.plannedTrips)
         
+        // Eğer ortak bir lokasyon/tarih yoksa direkt 0 döndür
+        if overlappingTrips.isEmpty {
+            return 0
+        }
+        
+        var totalScore = 40.0 // Lokasyon eşleştiği için başlangıç puanı
+        
+        // 2. Profil Benzerliği (%40 Ağırlık)
+        if let myWeights = currentUser.profileWeights, let theirWeights = candidate.profileWeights {
+            var similarity: Double = 0
+            for (profile, weight) in myWeights {
+                if let candidateWeight = theirWeights[profile] {
+                    similarity += weight * candidateWeight
+                }
+            }
+            totalScore += similarity * 40.0
+        } else {
+            totalScore += 20.0
+        }
+        
+        // 3. Bütçe Uyumu (%10 Ağırlık)
+        if currentUser.budget == candidate.budget {
+            totalScore += 10.0
+        } else if isBudgetCompatible(currentUser.budget, candidate.budget) {
+            totalScore += 5.0
+        }
+        
+        // 4. Yaş Uyumu (%10 Ağırlık)
+        let ageDiff = abs((currentUser.age ?? 25) - candidate.age)
+        if ageDiff <= 5 {
+            totalScore += 10.0
+        } else if ageDiff <= 12 {
+            totalScore += 5.0
+        }
+        
+        let finalScore = Int(min(totalScore, 100.0))
+        print("✅ [MatchingEngine] \(candidate.username) için Eşleşme Puanı: %\(finalScore)")
+        return finalScore
+    }
+    
+    private static func findOverlappingTrips(myTrips: [GeminiTripPlan], theirTrips: [PlannedTrip]) -> [PlannedTrip] {
+        var overlaps: [PlannedTrip] = []
         let calendar = Calendar.current
         
-        // 1. HARD FILTER: Location + Date Overlap (±3 days)
-        for userTrip in currentUserTrips {
-            guard let userStart = userTrip.startDate, let userEnd = userTrip.endDate else { continue }
+        for myTrip in myTrips {
+            guard let myStart = myTrip.startDate, let myEnd = myTrip.endDate else { continue }
             
-            for candidateTrip in candidate.plannedTrips {
+            for theirTrip in theirTrips {
                 // Lokasyon kontrolü
-                if candidateTrip.location.caseInsensitiveCompare(userTrip.selectedDestination) == .orderedSame || userTrip.selectedDestination.lowercased().contains(candidateTrip.location.lowercased()) {
+                if theirTrip.location.caseInsensitiveCompare(myTrip.selectedDestination) == .orderedSame || 
+                    myTrip.selectedDestination.lowercased().contains(theirTrip.location.lowercased()) {
                     
-                    // Tarih kontrolü (±3 gün tolerans ile çakışma kontrolü)
-                    // Toleranslı aralıklar
-                    guard let toleratedStart = calendar.date(byAdding: .day, value: -3, to: userStart),
-                          let toleratedEnd = calendar.date(byAdding: .day, value: 3, to: userEnd) else { continue }
+                    // ±3 gün toleranslı tarih kontrolü
+                    guard let toleratedStart = calendar.date(byAdding: .day, value: -3, to: myStart),
+                          let toleratedEnd = calendar.date(byAdding: .day, value: 3, to: myEnd) else { continue }
                     
-                    // İki zaman aralığının (A ve B) kesişmesi için -> A'nın başlangıcı <= B'nin bitişi && A'nın bitişi >= B'nin başlangıcı
-                    if toleratedStart <= candidateTrip.endDate && toleratedEnd >= candidateTrip.startDate {
-                        passesFilter = true
-                        break
+                    if toleratedStart <= theirTrip.endDate && toleratedEnd >= theirTrip.startDate {
+                        overlaps.append(theirTrip)
                     }
                 }
             }
-            if passesFilter { break }
         }
-        
-        if !passesFilter {
-            return 0 // Ortak lokasyon/tarih yoksa eşleşme olmaz
-        }
-        
-        print("🔍 [MatchingEngine] Filtreyi geçti: \(currentUser.name) <=> \(candidate.username)")
-        
-        var totalScore: Double = 0.0
-        
-        // 2. Budget (50 Puan)
-        // Aynı -> 50, Yakın -> 35, Farklı -> 15
-        if currentUser.budget == candidate.budget {
-            totalScore += 50.0
-        } else if (currentUser.budget == .low && candidate.budget == .medium) ||
-                    (currentUser.budget == .medium && candidate.budget == .low) ||
-                    (currentUser.budget == .medium && candidate.budget == .high) ||
-                    (currentUser.budget == .high && candidate.budget == .medium) {
-            totalScore += 35.0
-        } else {
-            totalScore += 15.0
-        }
-        
-        // 3. Gezgin Tipi (50 Puan)
-        // Aynı -> 50, Benzer/Ortak -> 35, Zıt -> 15 (Basit mantıkla aynıysa 50 değilse 35 verdik)
-        if let currentProfile = currentUser.travelProfile {
-            if currentProfile == candidate.travelerType {
-                totalScore += 50.0
-            } else {
-                totalScore += 35.0
-            }
-        } else {
-            totalScore += 35.0 // Profil seçilmemişse kısmi puan
-        }
-        
-        let finalScore = min(100, Int(totalScore))
-        print("✅ [MatchingEngine] \(candidate.username) için Toplam Eşleşme Puanı: %\(finalScore)")
-        
-        return finalScore
+        return overlaps
+    }
+    
+    private static func isBudgetCompatible(_ b1: BudgetRange?, _ b2: BudgetRange?) -> Bool {
+        guard let b1 = b1, let b2 = b2 else { return false }
+        // Low ve High birbiriyle uyumsuz, Medium herkesle uyumlu gibi bir mantık
+        if b1 == .medium || b2 == .medium { return true }
+        return b1 == b2
     }
 }

@@ -1,105 +1,178 @@
 import SwiftUI
 
 struct TravelResultView: View {
-    let profile: TravelProfile
+    let weights: [String: Double]
     @EnvironmentObject var authVM: AuthViewModel
     @Environment(\.dismiss) var dismiss
 
+    private var sortedProfiles: [(key: String, value: Double)] {
+        weights.sorted { $0.value > $1.value }
+    }
+
+    private var topProfile: String {
+        sortedProfiles.first?.key ?? "Kültür Kaşifi"
+    }
+
+    @State private var selectedType: TravelType = .solo
+    @State private var selectedBudget: BudgetRange = .medium
+    @State private var companions: [Companion] = []
+    
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color(UIColor.systemBackground).ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                // MARK: - Top Header
-                VStack(spacing: 8) {
-                    Text("ANALİZ TAMAMLANDI")
-                        .font(.system(size: 14, weight: .black))
-                        .foregroundColor(.blue)
-                        .kerning(2)
-                    
-                    Text("Senin İçin En Uygun Rotaları Hazırladık")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 40)
-
-                Spacer()
-
-                // MARK: - Badge Area
-                VStack(spacing: 25) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.05))
-                            .frame(width: 220, height: 220)
+            ScrollView {
+                VStack(spacing: 30) {
+                    VStack(spacing: 8) {
+                        Text("ANALİZ TAMAMLANDI")
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundColor(.blue)
+                            .kerning(2)
                         
-                        Circle()
-                            .stroke(Color.blue.opacity(0.2), lineWidth: 2)
-                            .frame(width: 250, height: 250)
-                        
-                        VStack(spacing: 15) {
-                            Text(getEmoji(for: profile))
-                                .font(.system(size: 70))
+                        Text("Karakteristik Gezgin Profilin")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 40)
+
+                    // MARK: - Badge Area
+                    VStack(spacing: 20) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue.opacity(0.05))
+                                .frame(width: 140, height: 140)
                             
-                            Text(profile.rawValue.uppercased())
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                                .foregroundColor(.primary)
+                            Text(getEmoji(for: topProfile))
+                                .font(.system(size: 60))
+                        }
+
+                        VStack(spacing: 6) {
+                            Text(topProfile.uppercased())
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                            
+                            Text(getDescription(for: topProfile))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
                         }
                     }
 
-                    Text(getDescription(for: profile))
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
-
-                Spacer()
-
-                // MARK: - Bottom Button
-                Button(action: {
-                    withAnimation {
-                        // Onboarding'i bitirir ve profili de User objesine kaydeder
-                        authVM.completeOnboarding(with: profile)
-                        dismiss()
+                    // MARK: - Preferences Section
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text("Seyahat Tercihlerin")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Nasıl Seyahat Edersin?").font(.subheadline.bold())
+                            Picker("Gezgin Tipi", selection: $selectedType) {
+                                ForEach(TravelType.allCases) { type in
+                                    Text(type.rawValue).tag(type)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .onChange(of: selectedType) { newValue in
+                                if newValue == .solo {
+                                    companions = []
+                                } else if companions.isEmpty {
+                                    companions = [Companion(age: 25, gender: "Kadın")]
+                                }
+                            }
+                        }
+                        
+                        if selectedType != .solo {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("Yanındakiler").font(.subheadline.bold())
+                                    Spacer()
+                                    Button(action: { companions.append(Companion(age: 25, gender: "Kadın")) }) {
+                                        Label("Ekle", systemImage: "plus.circle.fill")
+                                            .font(.caption.bold())
+                                    }
+                                }
+                                
+                                ForEach(0..<companions.count, id: \.self) { index in
+                                    HStack {
+                                        Picker("Yaş", selection: $companions[index].age) {
+                                            ForEach(18...80, id: \.self) { age in
+                                                Text("\(age)").tag(age)
+                                            }
+                                        }
+                                        .pickerStyle(.menu)
+                                        
+                                        Picker("Cinsiyet", selection: $companions[index].gender) {
+                                            Text("Kadın").tag("Kadın")
+                                            Text("Erkek").tag("Erkek")
+                                        }
+                                        .pickerStyle(.menu)
+                                        
+                                        Button(action: { companions.remove(at: index) }) {
+                                            Image(systemName: "minus.circle.fill").foregroundColor(.red)
+                                        }
+                                    }
+                                    .padding(8)
+                                    .background(Color.gray.opacity(0.05))
+                                    .cornerRadius(8)
+                                }
+                            }
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Bütçen?").font(.subheadline.bold())
+                            Picker("Bütçe", selection: $selectedBudget) {
+                                ForEach(BudgetRange.allCases) { budget in
+                                    Text(budget.displayName).tag(budget)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
                     }
-                }) {
-                    HStack {
-                        Text("Keşfetmeye Başla")
-                        Image(systemName: "arrow.right")
+                    .padding(.horizontal, 30)
+
+                    Button(action: {
+                        withAnimation {
+                            authVM.completeOnboarding(
+                                with: weights,
+                                travelType: selectedType,
+                                budget: selectedBudget,
+                                companions: companions
+                            )
+                            dismiss()
+                        }
+                    }) {
+                        HStack {
+                            Text("Keşfetmeye Başla")
+                            Image(systemName: "arrow.right")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(Color.blue)
+                        .cornerRadius(18)
                     }
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
-                    .background(
-                        LinearGradient(colors: [.blue, .blue.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
-                    )
-                    .cornerRadius(20)
-                    .shadow(color: .blue.opacity(0.3), radius: 15, x: 0, y: 8)
+                    .padding(.horizontal, 30)
+                    .padding(.bottom, 40)
                 }
-                .padding(.horizontal, 30)
-                .padding(.bottom, 40)
             }
         }
     }
 
-    private func getEmoji(for profile: TravelProfile) -> String {
-        switch profile {
-        case .culture: return "🏛️"
-        case .nature: return "🏔️"
-        case .food: return "🍝"
-        case .luxury: return "💎"
-        case .history: return "📜"
-        }
+    private func getEmoji(for profileName: String) -> String {
+        if profileName.contains("Kültür") { return "🏛️" }
+        if profileName.contains("Doğa") { return "🏔️" }
+        if profileName.contains("Lezzet") { return "🍝" }
+        if profileName.contains("Lüks") { return "💎" }
+        if profileName.contains("Tarih") { return "📜" }
+        return "🌍"
     }
 
-    private func getDescription(for profile: TravelProfile) -> String {
-        switch profile {
-        case .culture: return "Sen bir kültür elçisisin! Müzeler, sanat galerileri ve şehir ruhu tam sana göre."
-        case .nature: return "Doğa senin evin! Dağlar, göller ve temiz hava ile yenilenmeye hazırsın."
-        case .food: return "Midenin sesini dinliyorsun! Dünyanın en lezzetli durakları seni bekliyor."
-        case .luxury: return "Konfor senin için öncelik! En şık oteller ve premium deneyimlerin tadını çıkar."
-        case .history: return "Geçmişin izindesin! Antik kentler ve tarihi yapılar senin tutkun."
-        }
+    private func getDescription(for profileName: String) -> String {
+        if profileName.contains("Kültür") { return "Sen bir kültür elçisisin! Müzeler ve şehir ruhu tam sana göre." }
+        if profileName.contains("Doğa") { return "Doğa senin evin! Dağlar ve temiz hava ile yenilenmeye hazırsın." }
+        if profileName.contains("Lezzet") { return "Midenin sesini dinliyorsun! En lezzetli duraklar seni bekliyor." }
+        if profileName.contains("Lüks") { return "Konfor senin için öncelik! Premium deneyimlerin tadını çıkar." }
+        if profileName.contains("Tarih") { return "Geçmişin izindesin! Antik kentler senin tutkun." }
+        return "Keşfetmeyi seven bir ruhun var!"
     }
 }

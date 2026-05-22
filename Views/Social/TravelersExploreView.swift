@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct TravelersExploreView: View {
+    var targetTrip: GeminiTripPlan? = nil
     @EnvironmentObject var authVM: AuthViewModel
+    @EnvironmentObject var router: AppRouter
     @StateObject private var savedTripsManager = SavedTripsManager.shared
     @StateObject private var socialManager = SocialManager.shared
     
@@ -52,13 +54,13 @@ struct TravelersExploreView: View {
             .background(Color(.systemGroupedBackground).edgesIgnoringSafeArea(.bottom))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: InboxView()) {
+                    Button(action: { router.navigateToInbox() }) {
                         ZStack {
                             Image(systemName: "message.fill")
                                 .font(.title3)
                                 .foregroundColor(Color(hex: "#008285"))
                             
-                            let unreadCount = socialManager.myIncomingRequests.count
+                            let unreadCount = socialManager.totalUnreadCount
                             if unreadCount > 0 {
                                 Text("\(unreadCount)")
                                     .font(.system(size: 10, weight: .bold))
@@ -78,7 +80,7 @@ struct TravelersExploreView: View {
                 }
                 generateDynamicMatches()
             }
-            .onChange(of: authVM.currentUser?.travelProfile) { _ in
+            .onChange(of: authVM.currentUser?.profileWeights) { _ in
                 generateDynamicMatches()
             }
             .onChange(of: savedTripsManager.savedTrips.count) { _ in
@@ -90,41 +92,49 @@ struct TravelersExploreView: View {
     private func generateDynamicMatches() {
         guard let realUser = authVM.currentUser else { return }
         
-        let allUsers = DatabaseManager.shared.getAllUsers()
-        var generatedMatches: [MatchResult] = []
-        
-        for user in allUsers {
-            // Kendimizi göstermeyelim
-            if user.id == realUser.id { continue }
-            
-            // Diğer kullanıcının rotalarını UserDefaults'tan çek
-            let rawUserTrips = SavedTripsManager.getTrips(for: user.id)
-            
-            // Traveler objesine dönüştürüyoruz
-            var candidatePlannedTrips: [PlannedTrip] = []
-            for trip in rawUserTrips {
-                if let sDate = trip.startDate, let eDate = trip.endDate {
-                    candidatePlannedTrips.append(PlannedTrip(location: trip.selectedDestination, startDate: sDate, endDate: eDate))
+        DatabaseManager.shared.getAllUsers { allUsers in
+            Task {
+                var generatedMatches: [MatchResult] = []
+                
+                for user in allUsers {
+                    // Kendimizi göstermeyelim
+                    if user.id == realUser.id { continue }
+                    
+                    // Diğer kullanıcının rotalarını UserDefaults'tan çek
+                    let rawUserTrips = await SavedTripsManager.getTrips(for: user.id)
+                    
+                    // Traveler objesine dönüştürüyoruz
+                    var candidatePlannedTrips: [PlannedTrip] = []
+                    for trip in rawUserTrips {
+                        if let sDate = trip.startDate, let eDate = trip.endDate {
+                            candidatePlannedTrips.append(PlannedTrip(location: trip.selectedDestination, startDate: sDate, endDate: eDate))
+                        }
+                    }
+                    
+                    let candidate = Traveler(
+                        id: user.id, // ID önemli (Mesajlaşabilmek için User ID'sini tutuyoruz)
+                        username: user.name ?? "Gezgin",
+                        age: user.age ?? 25,
+                        budget: user.budget ?? .medium,
+                        travelType: user.travelType ?? .solo,
+                        profileWeights: user.profileWeights ?? [:],
+                        companions: user.companions ?? [],
+                        plannedTrips: candidatePlannedTrips,
+                        bio: "Merhabalar"
+                    )
+                    
+                    let destination = candidate.plannedTrips.first?.location
+                    let matchDetails = await NeuralMatchingEngine.shared.calculateMatchScore(user1: realUser, user2: candidate, destination: destination)
+                    if matchDetails.score > 0 {
+                        generatedMatches.append(MatchResult(traveler: candidate, matchScore: matchDetails.score, explanations: matchDetails.explanations))
+                    }
+                }
+                
+                await MainActor.run {
+                    self.matches = generatedMatches.sorted(by: { $0.matchScore > $1.matchScore })
+                    self.hasCalculated = true
                 }
             }
-            
-            let candidate = Traveler(
-                id: user.id, // ID önemli (Mesajlaşabilmek için User ID'sini tutuyoruz)
-                username: user.name,
-                age: user.age,
-                budget: user.budget,
-                travelerType: user.travelProfile ?? .culture,
-                plannedTrips: candidatePlannedTrips,
-                bio: "Merhabalar"
-            )
-            
-            let score = MatchingEngine.calculateScore(currentUser: realUser, candidate: candidate, currentUserTrips: savedTripsManager.savedTrips)
-            if score > 0 {
-                generatedMatches.append(MatchResult(traveler: candidate, matchScore: score))
-            }
         }
-        
-        self.matches = generatedMatches.sorted(by: { $0.matchScore > $1.matchScore })
-        self.hasCalculated = true
     }
 }

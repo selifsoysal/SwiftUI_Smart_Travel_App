@@ -47,3 +47,28 @@ playground.xcworkspace
 # Scripts/API Responses
 response.json
 gemini_payload.json
+
+# Thesis files
+LisansTeziSablon/
+*.pdf
+
+# Config and API keys
+Core/Config.swift
+GoogleService-Info.plist
+
+# Temp scripts & output
+default.csv
+files_in_project.txt
+files_on_disk.txt
+fix_engine.swift
+gemini_out.json
+gemini_payload.json
+generate_data.py
+models.json
+output.json
+rename.rb
+test_createml.swift
+test_gemini.sh
+test_gemini_payload.sh
+test_gemini_sdk.swift
+add_files.rb

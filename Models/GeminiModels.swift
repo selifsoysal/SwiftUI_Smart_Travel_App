@@ -4,30 +4,55 @@ import Foundation
 // Bu model yapısı, doğrudan Gemini'den dönecek JSON formatıyla uyumlu olacak şekilde hazırlanmıştır.
 
 struct GeminiTripPlan: Codable, Identifiable {
-    var id: UUID = UUID()
+    var id: String? // Firestore document ID
+    var userId: String? // Firebase User ID
     var startDate: Date?
     var endDate: Date?
-    let selectedDestination: String
-    let tripTitle: String
-    let itinerary: [DailyItinerary]
-    let generalTips: [String]
+    var selectedDestination: String
+    var tripTitle: String
+    var itinerary: [DailyItinerary]
+    var generalTips: [String]
+    var isPublic: Bool? = false
+    var creatorName: String?
+    var creatorAvatar: String?
+    var creatorProfileWeights: [String: Double]?
+    var creatorTravelType: String?
+    var creatorBudget: String?
+    var creatorAge: Int?
+    var creatorGender: String?
+    var creatorCompanions: [Companion]? = []
+    var participants: [String]? = [] // Array of User IDs
+    var sharingMode: SharingMode? = .none
     
-    // id alanını JSON parse ederken beklememek için CodingKeys tanımı:
     enum CodingKeys: String, CodingKey {
+        case id
+        case userId
         case startDate
         case endDate
         case selectedDestination
         case tripTitle
         case itinerary
         case generalTips
+        case isPublic
+        case creatorName
+        case creatorAvatar
+        case creatorProfileWeights
+        case creatorTravelType
+        case creatorBudget
+        case creatorAge
+        case creatorGender
+        case creatorCompanions
+        case participants
+        case sharingMode
     }
 }
+
 
 struct DailyItinerary: Codable, Identifiable {
     var id: UUID = UUID()
     let dayNumber: Int
     let dateDescription: String
-    let activities: [Activity]
+    var activities: [Activity]
     
     enum CodingKeys: String, CodingKey {
         case dayNumber

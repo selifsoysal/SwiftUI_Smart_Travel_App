@@ -30,10 +30,10 @@ extension TravelProfile {
 
 // Kiminle seyahat ediliyor?
 enum TravelType: String, CaseIterable, Identifiable, Codable {
-    case solo = "Solo"
-    case couple = "Couple"
-    case family = "Family"
-    case friends = "Friends"
+    case solo = "Yalnız"
+    case partner = "Partner/Eş"
+    case family = "Aile"
+    case friends = "Arkadaş Grubu"
     
     var id: String { self.rawValue }
 }
@@ -45,6 +45,19 @@ enum BudgetRange: String, CaseIterable, Identifiable, Codable {
     case high = "High"
     
     var id: String { self.rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .low: return "Düşük"
+        case .medium: return "Orta"
+        case .high: return "Yüksek"
+        }
+    }
+    
+    static func displayName(for raw: String?) -> String {
+        guard let raw = raw else { return "Belirtilmemiş" }
+        return BudgetRange(rawValue: raw)?.displayName ?? raw
+    }
 }
 
 enum PlanMode: String, Codable, Identifiable {
@@ -53,3 +66,10 @@ enum PlanMode: String, Codable, Identifiable {
     
     var id: String { self.rawValue }
 }
+
+enum SharingMode: String, Codable {
+    case none
+    case fullTrip
+    case specificEvents
+}
+

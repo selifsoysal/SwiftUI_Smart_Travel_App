@@ -1,5 +1,7 @@
 import Foundation
 import SwiftUI
+import FirebaseAuth
+import FirebaseFirestore
 
 final class AuthViewModel: ObservableObject {
     
@@ -12,142 +14,199 @@ final class AuthViewModel: ObservableObject {
     private let userKey = "loggedInUser"
 
     init() {
-        // Uygulama ilk açıldığında yerel veriyi kontrol et
-        loadUserFromStorage()
+        // Uygulama ilk açıldığında Firebase oturumunu kontrol et
+        checkIfLoggedIn()
     }
 
     // MARK: - LOGIN
     func login(email: String, password: String) {
         errorMessage = nil
-        guard validateFields(email: email, password: password) else { return }
+        if email.isEmpty || password.isEmpty {
+            errorMessage = "Lütfen tüm alanları doldurun."
+            return
+        }
         
         isLoading = true
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.isLoading = false
+        Auth.auth().signIn(withEmail: email, password: password) { [weak self] authResult, error in
+            guard let self = self else { return }
             
-            if let user = self.db.findUser(email: email) {
-                if user.password == password {
-                    self.currentUser = user
-                    self.isAuthenticated = true // Giriş başarılı
-                    self.saveUserToStorage(user) // Veriyi kalıcı hale getir
-                    
-                    // Geçiş yapıldıktan sonra o kullanıcıya özel favorileri/rotaları belleğe al
-                    DispatchQueue.main.async {
-                        SavedPlacesManager.shared.loadPlaces()
-                        SavedTripsManager.shared.loadTrips()
+            if let error = error {
+                self.isLoading = false
+                self.errorMessage = "Giriş hatası: \(error.localizedDescription)"
+                return
+            }
+            
+            guard let uid = authResult?.user.uid else {
+                self.isLoading = false
+                return
+            }
+            
+            // Firestore'dan kullanıcı verilerini çek
+            print("DEBUG: !!! Giriş Yapıldı, Firestore'dan kullanıcı aranıyor: \(uid) !!!")
+            self.db.findUser(userId: uid) { user in
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    if let user = user {
+                        print("DEBUG: !!! Giriş Başarılı: \(user.name ?? "İsimsiz") !!!")
+                        self.currentUser = user
+                        self.isAuthenticated = true
+                        self.saveUserToLocal(user)
+                        
+                        // Verileri yükle (Real-time dinleyicileri başlat)
+                        SavedPlacesManager.shared.setupListener()
+                        SavedTripsManager.shared.setupListener()
+                        SocialManager.shared.loadSocialData(for: user.id)
+                    } else {
+                        print("DEBUG: !!! HATA: Giriş yapan kullanıcının verisi Firestore'da bulunamadı! !!!")
+                        self.errorMessage = "Kullanıcı verileri bulunamadı."
                     }
-                } else {
-                    self.errorMessage = "Hatalı şifre girdiniz."
                 }
-            } else {
-                self.errorMessage = "Bu e-posta ile kullanıcı bulunamadı."
             }
         }
     }
 
     // MARK: - REGISTER
-    func register(email: String, password: String, name: String, birthDate: Date) {
+    func register(email: String, password: String, name: String, birthDate: Date, gender: String) {
         errorMessage = nil
-        guard validateFields(email: email, password: password) else { return }
-        guard !name.isEmpty else {
-            errorMessage = "Lütfen adınızı girin."
+        if email.isEmpty || password.isEmpty || name.isEmpty {
+            errorMessage = "Lütfen tüm alanları doldurun."
             return
         }
 
         isLoading = true
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.isLoading = false
+        Auth.auth().createUser(withEmail: email, password: password) { [weak self] authResult, error in
+            guard let self = self else { return }
             
-            if self.db.findUser(email: email) != nil {
-                self.errorMessage = "Bu e-posta zaten kullanımda."
+            if let error = error {
+                self.isLoading = false
+                self.errorMessage = "Kayıt hatası: \(error.localizedDescription)"
                 return
             }
-
+            
+            guard let uid = authResult?.user.uid else {
+                self.isLoading = false
+                return
+            }
+            
             let age = Calendar.current.dateComponents([.year], from: birthDate, to: Date()).year ?? 18
 
             let newUser = User(
-                id: UUID(),
+                id: uid,
                 email: email,
-                password: password,
+                password: "", // Şifreyi Firestore'da tutmaya gerek yok
                 name: name,
                 age: age,
-                gender: "Belirtilmemiş",
-                travelProfile: nil,
+                gender: gender,
+                profileWeights: [:], // Başlangıçta boş
                 travelType: .solo,
                 budget: .medium,
                 isOnboardingCompleted: false
             )
             
-            self.db.saveUser(newUser)
-            self.currentUser = newUser
-            self.isAuthenticated = true
-            self.saveUserToStorage(newUser)
-            
-            // Geçiş yapıldıktan sonra yeni kullanıcı için boş dizileri hafızaya al
-            DispatchQueue.main.async {
-                SavedPlacesManager.shared.loadPlaces()
-                SavedTripsManager.shared.loadTrips()
+            // Firestore'a kaydet
+            self.db.saveUser(newUser) { error in
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    if let error = error {
+                        self.errorMessage = "Profil oluşturulamadı: \(error.localizedDescription)"
+                    } else {
+                        self.currentUser = newUser
+                        self.isAuthenticated = true
+                        self.saveUserToLocal(newUser)
+                        
+                        SavedPlacesManager.shared.setupListener()
+                        SavedTripsManager.shared.setupListener()
+                        SocialManager.shared.loadSocialData(for: newUser.id)
+                    }
+                }
             }
         }
     }
 
     // MARK: - ONBOARDING COMPLETE
-    func completeOnboarding(with profile: TravelProfile) {
+    func completeOnboarding(with weights: [String: Double], travelType: TravelType, budget: BudgetRange, companions: [Companion]) {
         guard var user = currentUser else { return }
         
-        // Durumu güncelle
         user.isOnboardingCompleted = true
-        user.travelProfile = profile
+        user.profileWeights = weights
+        user.travelType = travelType
+        user.budget = budget
+        user.companions = companions
         
-        // Hem hafızayı hem de depolamayı güncelle
         self.currentUser = user
-        self.saveUserToStorage(user)
-        self.db.saveUser(user) // Eğer DB yapında güncellenmiş kullanıcıyı kaydetme varsa
+        self.saveUserToLocal(user)
+        
+        self.db.saveUser(user) { error in
+            if let error = error {
+                print("Onboarding güncelleme hatası: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func updateProfileImage(url: String) {
+        guard var user = currentUser else { return }
+        user.profileImageUrl = url
+        self.currentUser = user
+        self.saveUserToLocal(user)
+        
+        self.db.saveUser(user) { error in
+            if let error = error {
+                print("Profil fotoğrafı güncelleme hatası: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - LOGOUT
     func logout() {
-        currentUser = nil
-        isAuthenticated = false
-        UserDefaults.standard.removeObject(forKey: userKey)
-        
-        // Çıkış yapınca Singletons hafızasından başkasının verisini temizle
-        DispatchQueue.main.async {
-            SavedPlacesManager.shared.loadPlaces()
-            SavedTripsManager.shared.loadTrips()
+        do {
+            try Auth.auth().signOut()
+            currentUser = nil
+            isAuthenticated = false
+            UserDefaults.standard.removeObject(forKey: userKey)
+            
+            DispatchQueue.main.async {
+                AppRouter.shared.selectedTab = 0
+                SavedPlacesManager.shared.setupListener()
+                SavedTripsManager.shared.setupListener()
+                // SocialManager dinleyicileri temizlenebilir (opsiyonel)
+            }
+        } catch {
+            print("Çıkış hatası: \(error.localizedDescription)")
         }
     }
 
-    // MARK: - VALIDATION & STORAGE
-    private func validateFields(email: String, password: String) -> Bool {
-        if email.isEmpty || password.isEmpty {
-            errorMessage = "Lütfen tüm alanları doldurun."
-            return false
-        }
-        return true
-    }
-
-    private func saveUserToStorage(_ user: User) {
+    // MARK: - PRIVATE METHODS
+    private func saveUserToLocal(_ user: User) {
         if let encoded = try? JSONEncoder().encode(user) {
             UserDefaults.standard.set(encoded, forKey: userKey)
         }
     }
 
-    private func loadUserFromStorage() {
-        guard let data = UserDefaults.standard.data(forKey: userKey),
-              let user = try? JSONDecoder().decode(User.self, from: data) else {
-            // Kullanıcı yoksa varsayılan durumlar
+    private func checkIfLoggedIn() {
+        if let firebaseUser = Auth.auth().currentUser {
+            print("DEBUG: !!! Firebase Oturumu Açık: \(firebaseUser.uid) !!!")
+            // Firebase'de oturum açık, Firestore'dan veriyi tazele
+            db.findUser(userId: firebaseUser.uid) { [weak self] user in
+                DispatchQueue.main.async {
+                    if let user = user {
+                        print("DEBUG: !!! Mevcut Kullanıcı Tazelendi: \(user.name ?? "İsimsiz") !!!")
+                        self?.currentUser = user
+                        self?.isAuthenticated = true
+                        self?.saveUserToLocal(user)
+                        
+                        SavedPlacesManager.shared.setupListener()
+                        SavedTripsManager.shared.setupListener()
+                        SocialManager.shared.loadSocialData(for: user.id)
+                    } else {
+                        print("DEBUG: !!! UYARI: Oturum açık ama Firestore verisi bulunamadı! !!!")
+                        self?.isAuthenticated = false
+                    }
+                }
+            }
+        } else {
             self.isAuthenticated = false
-            self.currentUser = nil
-            return
         }
-        
-        // Kullanıcı bilgisini bellekte tut (login için pratiklik sağlayabilir)
-        self.currentUser = user
-        
-        // HER AÇILIŞTA GİRİŞ EKRANI İSTENDİĞİ İÇİN OTOMATİK LOGİN KAPATILDI
-        self.isAuthenticated = false 
     }
 }

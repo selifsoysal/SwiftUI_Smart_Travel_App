@@ -5,17 +5,21 @@ import Foundation
 
 struct PlannedTrip: Codable, Identifiable {
     var id: UUID = UUID()
+    var tripId: String?
     var location: String
     var startDate: Date
     var endDate: Date
 }
 
 struct Traveler: Identifiable, Codable {
-    var id: UUID = UUID()
+    var id: String
     var username: String
     var age: Int
+    var gender: String?
     var budget: BudgetRange
-    var travelerType: TravelProfile
+    var travelType: TravelType? = .solo
+    var profileWeights: [String: Double]?
+    var companions: [Companion]? = []
     var plannedTrips: [PlannedTrip]
     var bio: String?
 }
@@ -24,4 +28,5 @@ struct MatchResult: Identifiable {
     var id: UUID = UUID()
     var traveler: Traveler
     var matchScore: Int // 0-100 percentage
+    var explanations: [String] = []
 }

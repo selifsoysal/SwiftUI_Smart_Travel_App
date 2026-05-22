@@ -49,18 +49,26 @@ Routey (SmartTravelApp), seyahat planlamayı akıllı, kişiselleştirilmiş ve 
 
 ## Ekran Görüntüleri
 
-| Giriş & Kayıt | Kişilik Testi (Swipe) | Gezgin Tipi |
+| Kişilik Testi (Swipe) | Swipe Sonucu | Keşfet |
 |:---:|:---:|:---:|
-| <img src="SS/auth.png" width="250"/> | <img src="SS/swipe.png" width="250"/> | <img src="SS/traveler_type.png" width="250"/> |
+| <img src="SS/swipe.png" width="250"/> | <img src="SS/swipe_sonuc.png" width="250"/> | <img src="SS/kesfet.png" width="250"/> |
 
-| Keşfet | Akıllı Öneriler 1 | Akıllı Öneriler 2 |
+| Plan Oluşturma | Plan Oluşturma Detay | Plan Hazırlanıyor |
 |:---:|:---:|:---:|
-| <img src="SS/kesfet.png" width="250"/> | <img src="SS/oneri.png" width="250"/> | <img src="SS/oneri_2.png" width="250"/> |
+| <img src="SS/planla_1.png" width="250"/> | <img src="SS/planla_2.png" width="250"/> | <img src="SS/plan_hazirlanma_animasyonu.png" width="250"/> |
 
-| Plan Oluşturma | Plan Detayları | Kayıtlı Rotalar |
+| Plan Önizleme | Plan Özeti 1 | Plan Özeti 2 |
 |:---:|:---:|:---:|
-| <img src="SS/planla.png" width="250"/> | <img src="SS/planlama_2.png" width="250"/> | <img src="SS/rotalar.png" width="250"/> |
+| <img src="SS/plan_ozeti.png" width="250"/> | <img src="SS/kisinin_olusturdugu_plan_ozeti.png" width="250"/> | <img src="SS/kisinin_ol._plan_ozeti_2.png" width="250"/> |
 
-| Sosyal Eşleşme | Profil |
-|:---:|:---:|
-| <img src="SS/sosyal_eslesme.png" width="250"/> | <img src="SS/profilim.png" width="250"/> |
+| Paylaşılan Rotalar | Paylaşılan Etkinlikler | Uyum Analizi |
+|:---:|:---:|:---:|
+| <img src="SS/paylasilan_rotalar.png" width="250"/> | <img src="SS/paylasilan_etkinlikler.png" width="250"/> | <img src="SS/uyum_analizi.png" width="250"/> |
+
+| Mesajlar | Mesaj Sohbeti | Bildirimler |
+|:---:|:---:|:---:|
+| <img src="SS/mesajlar.png" width="250"/> | <img src="SS/mesaj_sohbeti.png" width="250"/> | <img src="SS/bildirimler.png" width="250"/> |
+
+| Profil |
+|:---:|
+| <img src="SS/profil.png" width="250"/> |

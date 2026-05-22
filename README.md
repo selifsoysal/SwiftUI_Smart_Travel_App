@@ -51,7 +51,7 @@ Routey (SmartTravelApp), seyahat planlamayı akıllı, kişiselleştirilmiş ve 
 
 | Kişilik Testi (Swipe) | Swipe Sonucu | Keşfet |
 |:---:|:---:|:---:|
-| <img src="SS/swipe.png" width="250"/> | <img src="SS/swipe_sonuc.png" width="250"/> | <img src="SS/kesfet.png" width="250"/> |
+| <img src="SS/swipe_yeni.png" width="250"/> | <img src="SS/swipe_sonuc.png" width="250"/> | <img src="SS/kesfet_yeni.png" width="250"/> |
 
 | Plan Oluşturma | Plan Oluşturma Detay | Plan Hazırlanıyor |
 |:---:|:---:|:---:|
@@ -59,7 +59,7 @@ Routey (SmartTravelApp), seyahat planlamayı akıllı, kişiselleştirilmiş ve 
 
 | Plan Önizleme | Plan Özeti 1 | Plan Özeti 2 |
 |:---:|:---:|:---:|
-| <img src="SS/plan_ozeti.png" width="250"/> | <img src="SS/kisinin_olusturdugu_plan_ozeti.png" width="250"/> | <img src="SS/kisinin_ol._plan_ozeti_2.png" width="250"/> |
+| <img src="SS/plan_ozeti.png" width="250"/> | <img src="SS/plan_ozeti_1.png" width="250"/> | <img src="SS/plan_ozeti_2.png" width="250"/> |
 
 | Paylaşılan Rotalar | Paylaşılan Etkinlikler | Uyum Analizi |
 |:---:|:---:|:---:|
